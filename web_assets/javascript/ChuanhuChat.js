@@ -24,7 +24,7 @@ var logginUser = null;
 var updateToast = null;
 var sendBtn = null;
 var cancelBtn = null;
-var sliders = null;
+// var sliders = null;
 var updateChuanhuBtn = null;
 var statusDisplay = null;
 
@@ -79,7 +79,7 @@ function initialize() {
     updateToast = gradioApp().querySelector("#toast-update");
     sendBtn = gradioApp().getElementById("submit-btn");
     cancelBtn = gradioApp().getElementById("cancel-btn");
-    sliders = gradioApp().querySelectorAll('input[type="range"]');
+    // sliders = gradioApp().querySelectorAll('input[type="range"]');
     updateChuanhuBtn = gradioApp().getElementById("update-chuanhu-btn");
     statusDisplay = gradioApp().querySelector('#status-display');
 
@@ -106,7 +106,7 @@ function initialize() {
     selectHistory();
     // setChatbotHeight();
     setPopupBoxPosition();
-    setSlider();
+    // setSlider();
     setCheckboxes();
     checkModel();
 
