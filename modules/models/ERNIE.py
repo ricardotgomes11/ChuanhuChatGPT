@@ -24,7 +24,7 @@ class ERNIE_Client(BaseLLMModel):
         使用 AK，SK 生成鉴权签名（Access Token）
         :return: access_token，或是None(如果错误)
         """
-        url = "https://aip.baidubce.com/oauth/2.0/token?client_id=" + self.api_key + "&client_secret=" + self.api_secret + "&grant_type=client_credentials"
+        url = f"https://aip.baidubce.com/oauth/2.0/token?client_id={self.api_key}&client_secret={self.api_secret}&grant_type=client_credentials"
 
         payload = json.dumps("")
         headers = {
