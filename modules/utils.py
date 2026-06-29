@@ -34,9 +34,7 @@ if TYPE_CHECKING:
 
 
 def predict(current_model, *args):
-    iter = current_model.predict(*args)
-    for i in iter:
-        yield i
+    yield from current_model.predict(*args)
 
 
 def billing_info(current_model):
@@ -64,9 +62,7 @@ def reset(current_model, *args):
 
 
 def retry(current_model, *args):
-    iter = current_model.retry(*args)
-    for i in iter:
-        yield i
+    yield from current_model.retry(*args)
 
 
 def delete_first_conversation(current_model, *args):
@@ -161,8 +157,7 @@ def count_token(input_str):
     encoding = tiktoken.get_encoding("cl100k_base")
     if type(input_str) == dict:
         input_str = f"role: {input_str['role']}, content: {input_str['content']}"
-    length = len(encoding.encode(input_str))
-    return length
+    return len(encoding.encode(input_str))
 
 
 def markdown_to_html_with_syntax_highlight(md_str):  # deprecated
@@ -250,7 +245,7 @@ def clip_rawtext(chat_message, need_escape=True):
     final_message = ""
     for i, part in enumerate(agent_parts):
         if i % 2 == 0:
-            if part != "" and part != "\n":
+            if part not in ["", "\n"]:
                 final_message += (
                     f'<pre class="fake-pre">{escape_markdown(part)}</pre>'
                     if need_escape
@@ -267,23 +262,22 @@ def convert_bot_before_marked(chat_message):
     """
     if '<div class="md-message">' in chat_message:
         return chat_message
-    else:
-        raw = f'<div class="raw-message hideM">{clip_rawtext(chat_message)}</div>'
-        # really_raw = f'{START_OF_OUTPUT_MARK}<div class="really-raw hideM">{clip_rawtext(chat_message, need_escape=False)}\n</div>{END_OF_OUTPUT_MARK}'
+    raw = f'<div class="raw-message hideM">{clip_rawtext(chat_message)}</div>'
+    # really_raw = f'{START_OF_OUTPUT_MARK}<div class="really-raw hideM">{clip_rawtext(chat_message, need_escape=False)}\n</div>{END_OF_OUTPUT_MARK}'
 
-        code_block_pattern = re.compile(r"```(.*?)(?:```|$)", re.DOTALL)
-        code_blocks = code_block_pattern.findall(chat_message)
-        non_code_parts = code_block_pattern.split(chat_message)[::2]
-        result = []
-        for non_code, code in zip(non_code_parts, code_blocks + [""]):
-            if non_code.strip():
-                result.append(non_code)
-            if code.strip():
-                code = f"\n```{code}\n```"
-                result.append(code)
-        result = "".join(result)
-        md = f'<div class="md-message">\n\n{result}\n</div>'
-        return raw + md
+    code_block_pattern = re.compile(r"```(.*?)(?:```|$)", re.DOTALL)
+    code_blocks = code_block_pattern.findall(chat_message)
+    non_code_parts = code_block_pattern.split(chat_message)[::2]
+    result = []
+    for non_code, code in zip(non_code_parts, code_blocks + [""]):
+        if non_code.strip():
+            result.append(non_code)
+        if code.strip():
+            code = f"\n```{code}\n```"
+            result.append(code)
+    result = "".join(result)
+    md = f'<div class="md-message">\n\n{result}\n</div>'
+    return raw + md
 
 
 def convert_user_before_marked(chat_message):
@@ -333,19 +327,13 @@ def convert_asis(userinput):  # deprecated
 
 def detect_converted_mark(userinput):  # deprecated
     try:
-        if userinput.endswith(ALREADY_CONVERTED_MARK):
-            return True
-        else:
-            return False
+        return bool(userinput.endswith(ALREADY_CONVERTED_MARK))
     except:
         return True
 
 
 def detect_language(code):  # deprecated
-    if code.startswith("\n"):
-        first_line = ""
-    else:
-        first_line = code.strip().split("\n", 1)[0]
+    first_line = "" if code.startswith("\n") else code.strip().split("\n", 1)[0]
     language = first_line.lower() if first_line else ""
     code_without_language = code[len(first_line) :].lstrip() if first_line else code
     return language, code_without_language
@@ -398,7 +386,7 @@ def save_file(filename, model, chatbot):
         "user_identifier": model.user_identifier,
         "metadata": model.metadata
     }
-    if not filename == os.path.basename(filename):
+    if filename != os.path.basename(filename):
         history_file_path = filename
     else:
         history_file_path = os.path.join(HISTORY_DIR, user_name, filename)
@@ -462,12 +450,11 @@ def get_history_names(user_name=""):
     logging.debug(f"从用户 {user_name} 中获取历史记录文件名列表")
     if user_name == "" and hide_history_when_not_logged_in:
         return []
-    else:
-        history_files = get_file_names_by_last_modified_time(
-            os.path.join(HISTORY_DIR, user_name)
-        )
-        history_files = [f[: f.rfind(".")] for f in history_files]
-        return history_files
+    history_files = get_file_names_by_last_modified_time(
+        os.path.join(HISTORY_DIR, user_name)
+    )
+    history_files = [f[: f.rfind(".")] for f in history_files]
+    return history_files
 
 
 def get_first_history_name(user_name=""):
@@ -569,11 +556,10 @@ def hide_middle_chars(s):
         return ""
     if len(s) <= 8:
         return s
-    else:
-        head = s[:4]
-        tail = s[-4:]
-        hidden = "*" * (len(s) - 8)
-        return head + hidden + tail
+    head = s[:4]
+    tail = s[-4:]
+    hidden = "*" * (len(s) - 8)
+    return head + hidden + tail
 
 
 def submit_key(key):
@@ -584,7 +570,7 @@ def submit_key(key):
 
 
 def replace_today(prompt):
-    today = datetime.datetime.today().strftime("%Y-%m-%d")
+    today = datetime.datetime.now().strftime("%Y-%m-%d")
     return prompt.replace("{current_date}", today)
 
 SERVER_GEO_IP_MSG = None
@@ -610,7 +596,7 @@ def get_geoip():
             data = response.json()
         except:
             data = {"error": True, "reason": "连接ipapi失败"}
-        if "error" in data.keys():
+        if "error" in data:
             logging.warning(f"无法获取IP地址信息。\n{data}")
             if data["reason"] == "RateLimited":
                 SERVER_GEO_IP_MSG = i18n("您的IP区域：未知。")
@@ -710,7 +696,7 @@ def add_source_numbers(lst, source_name="Source", use_source=True):
 
 def add_details(lst):
     nodes = []
-    for index, txt in enumerate(lst):
+    for txt in lst:
         brief = txt[:25].replace("\n", "")
         nodes.append(f"<details><summary>{brief}...</summary><p>{txt}</p></details>")
     return nodes
@@ -719,11 +705,8 @@ def add_details(lst):
 def sheet_to_string(sheet, sheet_name=None):
     result = []
     for index, row in sheet.iterrows():
-        row_string = ""
-        for column in sheet.columns:
-            row_string += f"{column}: {row[column]}, "
-        row_string = row_string.rstrip(", ")
-        row_string += "."
+        row_string = "".join(f"{column}: {row[column]}, " for column in sheet.columns)
+        row_string = row_string.rstrip(", ") + "."
         result.append(row_string)
     return result
 
@@ -779,8 +762,7 @@ def get_corresponding_file_type_by_model_name(selected_model_name):
 
 
 def new_auto_history_filename(username):
-    latest_file = get_first_history_name(username)
-    if latest_file:
+    if latest_file := get_first_history_name(username):
         with open(
             os.path.join(HISTORY_DIR, username, latest_file + ".json"),
             "r",
@@ -854,6 +836,4 @@ def replace_special_symbols(string, replace_string=" "):
     # 定义正则表达式，匹配所有特殊符号
     pattern = r"[!@#$%^&*()<>?/\|}{~:]"
 
-    new_string = re.sub(pattern, replace_string, string)
-
-    return new_string
+    return re.sub(pattern, replace_string, string)

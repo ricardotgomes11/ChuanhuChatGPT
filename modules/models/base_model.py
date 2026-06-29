@@ -464,8 +464,7 @@ class BaseLLMModel:
             search_results = []
             with DDGS() as ddgs:
                 ddgs_gen = ddgs.text(fake_inputs, backend="lite")
-                for r in islice(ddgs_gen, 10):
-                    search_results.append(r)
+                search_results.extend(iter(islice(ddgs_gen, 10)))
             reference_results = []
             for idx, result in enumerate(search_results):
                 logging.debug(f"搜索结果{idx + 1}：{result}")
@@ -508,28 +507,19 @@ class BaseLLMModel:
         reply_language="中文",
         should_check_token_count=True,
     ):  # repetition_penalty, top_k
-        status_text = "开始生成回答……"
         if type(inputs) == list:
             logging.info(
-                "用户"
-                + f"{self.user_name}"
-                + "的输入为："
-                + colorama.Fore.BLUE
-                + "("
-                + str(len(inputs) - 1)
-                + " images) "
+                f"用户{self.user_name}的输入为：{colorama.Fore.BLUE}({str(len(inputs) - 1)} images) "
                 + f"{inputs[0]['text']}"
                 + colorama.Style.RESET_ALL
             )
         else:
             logging.info(
-                "用户"
-                + f"{self.user_name}"
-                + "的输入为："
-                + colorama.Fore.BLUE
+                f"用户{self.user_name}的输入为：{colorama.Fore.BLUE}"
                 + f"{inputs}"
                 + colorama.Style.RESET_ALL
             )
+        status_text = "开始生成回答……"
         if should_check_token_count:
             if type(inputs) == list:
                 yield chatbot + [(inputs[0]["text"], "")], status_text
@@ -586,14 +576,12 @@ class BaseLLMModel:
         try:
             if stream:
                 logging.debug("使用流式传输")
-                iter = self.stream_next_chatbot(
+                yield from self.stream_next_chatbot(
                     inputs,
                     chatbot,
                     fake_input=fake_inputs,
                     display_append=display_append,
                 )
-                for chatbot, status_text in iter:
-                    yield chatbot, status_text
             else:
                 logging.debug("不使用流式传输")
                 chatbot, status_text = self.next_chatbot_at_once(
@@ -610,8 +598,7 @@ class BaseLLMModel:
 
         if len(self.history) > 1 and self.history[-1]["content"] != fake_inputs:
             logging.info(
-                "回答为："
-                + colorama.Fore.BLUE
+                f"回答为：{colorama.Fore.BLUE}"
                 + f"{self.history[-1]['content']}"
                 + colorama.Style.RESET_ALL
             )
@@ -667,7 +654,7 @@ class BaseLLMModel:
             yield chatbot, f"{STANDARD_ERROR_MSG}上下文是空的"
             return
 
-        iter = self.predict(
+        yield from self.predict(
             inputs,
             chatbot,
             stream=stream,
@@ -675,8 +662,6 @@ class BaseLLMModel:
             files=files,
             reply_language=reply_language,
         )
-        for x in iter:
-            yield x
         logging.debug("重试完毕")
 
     # def reduce_token_size(self, chatbot):
@@ -838,9 +823,7 @@ class BaseLLMModel:
     def token_message(self, token_lst=None):
         if token_lst is None:
             token_lst = self.all_token_counts
-        token_sum = 0
-        for i in range(len(token_lst)):
-            token_sum += sum(token_lst[: i + 1])
+        token_sum = sum(sum(token_lst[: i + 1]) for i in range(len(token_lst)))
         return (
             i18n("Token 计数: ")
             + f"{sum(token_lst)}"
@@ -875,7 +858,7 @@ class BaseLLMModel:
             user_question = self.history[0]["content"]
             if type(user_question) == list:
                 user_question = user_question[0]["text"]
-            filename = replace_special_symbols(user_question)[:16] + ".json"
+            filename = f"{replace_special_symbols(user_question)[:16]}.json"
             return self.rename_chat_history(filename, chatbot, self.user_name)
         else:
             return gr.update()
@@ -1010,7 +993,7 @@ class BaseLLMModel:
             history_file_path = os.path.join(HISTORY_DIR, self.user_name, filename)
         else:
             history_file_path = filename
-        md_history_file_path = history_file_path[:-5] + ".md"
+        md_history_file_path = f"{history_file_path[:-5]}.md"
         try:
             os.remove(history_file_path)
             os.remove(md_history_file_path)
@@ -1024,11 +1007,10 @@ class BaseLLMModel:
             )
 
     def auto_load(self):
-        filepath = get_history_filepath(self.user_name)
-        if not filepath:
-            self.history_file_path = new_auto_history_filename(self.user_name)
-        else:
+        if filepath := get_history_filepath(self.user_name):
             self.history_file_path = filepath
+        else:
+            self.history_file_path = new_auto_history_filename(self.user_name)
         return self.load_chat_history()
 
     def like(self):
